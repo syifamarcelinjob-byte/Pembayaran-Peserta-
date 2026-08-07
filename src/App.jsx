@@ -146,9 +146,10 @@ const FONTS = (
     @media print {
       body * { visibility: hidden; }
       .print-area, .print-area * { visibility: visible; }
-      .print-area { position: fixed; top: 0; left: 0; width: 100%; margin: 0; padding: 0; }
+      .print-area { display: block !important; position: absolute; top: 0; left: 0; width: 100%; margin: 0; padding: 0; }
       .no-print { display: none !important; }
     }
+    .print-only { display: none; }
   `}</style>
 );
 
@@ -215,7 +216,7 @@ function Modal({ title, onClose, children, wide }) {
 
 function Letterhead({ children, docLabel, docNo, docDate }) {
   return (
-    <div className="print-area bg-white text-[#1C2B40] w-full max-w-[720px] mx-auto p-10 font-body" style={{ minHeight: 500 }}>
+    <div className="bg-white text-[#1C2B40] w-full max-w-[720px] mx-auto p-10 font-body" style={{ minHeight: 500 }}>
       <div className="flex items-start justify-between border-b-2 border-[#1C2B40] pb-4 mb-6">
         <div className="flex items-start gap-3">
           <img src={LOGO_MAKARA} alt="Makara UI Academy" className="w-14 h-14 object-contain" />
@@ -761,6 +762,11 @@ export default function App() {
           </div>
           {previewDoc.type === "invoice" ? <InvoiceDoc data={previewDoc.data} /> : <KwitansiDoc data={previewDoc.data} />}
         </Modal>
+      )}
+      {previewDoc && (
+        <div className="print-area print-only">
+          {previewDoc.type === "invoice" ? <InvoiceDoc data={previewDoc.data} /> : <KwitansiDoc data={previewDoc.data} />}
+        </div>
       )}
     </div>
   );
