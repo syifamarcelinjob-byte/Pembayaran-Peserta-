@@ -349,13 +349,14 @@ export default function App() {
     setDraftInvoice({
       nama: p.nama, batch: p.batch, tahap: s.tahap,
       tanggal: new Date().toISOString().slice(0, 10),
-      deskripsi: `Pembayaran Program Pelatihan — s.d. Tahap ${s.tahap}`,
-      nominal: -s.selisih,
+      items: [{ deskripsi: `Pembayaran Program Pelatihan — s.d. Tahap ${s.tahap}`, nominal: -s.selisih }],
     });
   }
   function confirmInvoice(draft) {
     const nomor = `INV-${yyyymm(draft.tanggal)}-${seq3(invoices.length + 1)}`;
-    const data = { nomor, ...draft, nominal: Number(draft.nominal) };
+    const items = (draft.items || []).map((it) => ({ deskripsi: it.deskripsi, nominal: Number(it.nominal) || 0 }));
+    const total = items.reduce((a, it) => a + it.nominal, 0);
+    const data = { nomor, nama: draft.nama, batch: draft.batch, tanggal: draft.tanggal, tahap: draft.tahap, items, deskripsi: items[0]?.deskripsi || "", nominal: total };
     setInvoices([...invoices, data]);
     setPreviewDoc({ type: "invoice", data });
     setDraftInvoice(null);
@@ -829,18 +830,39 @@ function InvoiceEditForm({ initial, onSubmit, onCancel }) {
   const [nama, setNama] = useState(initial.nama);
   const [batch, setBatch] = useState(initial.batch || "");
   const [tanggal, setTanggal] = useState(initial.tanggal);
-  const [deskripsi, setDeskripsi] = useState(initial.deskripsi);
-  const [nominal, setNominal] = useState(initial.nominal);
+  const [items, setItems] = useState(
+    initial.items && initial.items.length ? initial.items : [{ deskripsi: initial.deskripsi || "", nominal: initial.nominal || "" }]
+  );
+  const total = items.reduce((a, it) => a + (Number(it.nominal) || 0), 0);
+  const setItem = (i, patch) => setItems(items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ nama, batch, tanggal: tanggal, tahap: initial.tahap, deskripsi, nominal }); }} className="space-y-3">
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit({ nama, batch, tanggal, tahap: initial.tahap, items: items.filter((it) => it.deskripsi || it.nominal) }); }} className="space-y-3">
       <div><label className="text-xs text-[#6B6455] block mb-1">Nama Peserta</label><Input value={nama} onChange={(e) => setNama(e.target.value)} required /></div>
       <div><label className="text-xs text-[#6B6455] block mb-1">Batch</label><Input value={batch} onChange={(e) => setBatch(e.target.value)} /></div>
       <div><label className="text-xs text-[#6B6455] block mb-1">Tanggal Invoice</label><Input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} /></div>
-      <div><label className="text-xs text-[#6B6455] block mb-1">Deskripsi</label><Input value={deskripsi} onChange={(e) => setDeskripsi(e.target.value)} /></div>
-      <div><label className="text-xs text-[#6B6455] block mb-1">Nominal (Rp)</label><Input type="number" value={nominal} onChange={(e) => setNominal(e.target.value)} required /></div>
+
+      <div>
+        <label className="text-xs text-[#6B6455] block mb-1">Rincian Tagihan</label>
+        <div className="space-y-2">
+          {items.map((it, i) => (
+            <div key={i} className="flex gap-2 items-start">
+              <div className="flex-1"><Input placeholder="Deskripsi (mis. Biaya seragam)" value={it.deskripsi} onChange={(e) => setItem(i, { deskripsi: e.target.value })} /></div>
+              <div className="w-36"><Input type="number" placeholder="Nominal" value={it.nominal} onChange={(e) => setItem(i, { nominal: e.target.value })} /></div>
+              <button type="button" disabled={items.length === 1} onClick={() => setItems(items.filter((_, idx) => idx !== i))}
+                className="px-2 py-2 text-[#A6402F] disabled:opacity-30" title="Hapus baris">×</button>
+            </div>
+          ))}
+        </div>
+        <button type="button" onClick={() => setItems([...items, { deskripsi: "", nominal: "" }])} className="mt-2 text-xs text-[#1C2B40] hover:underline">+ Tambah baris</button>
+      </div>
+
+      <div className="flex justify-between items-center border-t border-[#E4DFD3] pt-3 text-sm">
+        <span className="text-[#6B6455]">Total</span>
+        <span className="font-display font-semibold text-lg">{fmtRp(total)}</span>
+      </div>
       <div className="flex gap-2 pt-2">
-        <Btn type="submit">Buat Invoice</Btn>
+        <Btn type="submit" disabled={total <= 0}>Buat Invoice</Btn>
         <Btn type="button" variant="ghost" onClick={onCancel}>Batal</Btn>
       </div>
     </form>
@@ -890,10 +912,12 @@ function InvoiceDoc({ data }) {
           </tr>
         </thead>
         <tbody>
-          <tr className="border-b border-[#EFEBDF]">
-            <td className="py-3">{data.deskripsi || `Pembayaran Program Pelatihan — s.d. Tahap ${data.tahap}`}</td>
-            <td className="py-3 text-right">{fmtRp(data.nominal)}</td>
-          </tr>
+          {(data.items && data.items.length ? data.items : [{ deskripsi: data.deskripsi || `Pembayaran Program Pelatihan — s.d. Tahap ${data.tahap}`, nominal: data.nominal }]).map((it, i) => (
+            <tr key={i} className="border-b border-[#EFEBDF]">
+              <td className="py-3">{it.deskripsi}</td>
+              <td className="py-3 text-right">{fmtRp(it.nominal)}</td>
+            </tr>
+          ))}
         </tbody>
         <tfoot>
           <tr>
