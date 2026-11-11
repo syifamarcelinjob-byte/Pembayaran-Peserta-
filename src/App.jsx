@@ -262,6 +262,7 @@ export default function App() {
   const [confirmDelete, setConfirmDelete] = useState(null); // {type:'peserta'|'log', id, label}
   const [waTone, setWaTone] = useState({}); // { [pesertaId]: 'pengingat'|'telat'|'eskalasi' }
   const [draftInvoice, setDraftInvoice] = useState(null);
+  const [pickingInvoice, setPickingInvoice] = useState(false);
   const [draftKwitansi, setDraftKwitansi] = useState(null);
 
   const ready = configLoaded && pesertaLoaded && logsLoaded;
@@ -351,6 +352,16 @@ export default function App() {
       tanggal: new Date().toISOString().slice(0, 10),
       items: [{ deskripsi: `Pembayaran Program Pelatihan — s.d. Tahap ${s.tahap}`, nominal: -s.selisih }],
     });
+  }
+  function openManualInvoiceDraft(pesertaId) {
+    const p = pesertaList.find((x) => x.id === pesertaId);
+    if (!p) return;
+    setDraftInvoice({
+      nama: p.nama, batch: p.batch, tahap: null,
+      tanggal: new Date().toISOString().slice(0, 10),
+      items: [{ deskripsi: "", nominal: "" }],
+    });
+    setPickingInvoice(false);
   }
   function confirmInvoice(draft) {
     const nomor = `INV-${yyyymm(draft.tanggal)}-${seq3(invoices.length + 1)}`;
@@ -596,7 +607,10 @@ export default function App() {
 
           {tab === "invoice" && (
             <div>
-              <h2 className="font-display text-xl font-semibold text-[#1C2B40] mb-4">Invoice</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-display text-xl font-semibold text-[#1C2B40]">Invoice</h2>
+                <Btn onClick={() => setPickingInvoice(true)}>+ Invoice Manual</Btn>
+              </div>
               <div className="bg-white border border-[#E4DFD3] rounded-lg mb-6">
                 <div className="px-5 py-3 border-b border-[#E4DFD3] font-display font-semibold text-[#1C2B40]">Perlu Dibuatkan Invoice</div>
                 {perluInvoice.length === 0 ? (
@@ -746,6 +760,11 @@ export default function App() {
           </div>
         </Modal>
       )}
+      {pickingInvoice && (
+        <Modal title="Invoice Manual" onClose={() => setPickingInvoice(false)}>
+          <InvoicePicker pesertaList={pesertaList} onPick={openManualInvoiceDraft} onCancel={() => setPickingInvoice(false)} />
+        </Modal>
+      )}
       {draftInvoice && (
         <Modal title="Cek & Edit Invoice" onClose={() => setDraftInvoice(null)}>
           <InvoiceEditForm initial={draftInvoice} onSubmit={confirmInvoice} onCancel={() => setDraftInvoice(null)} />
@@ -826,6 +845,25 @@ function LogForm({ pesertaList, onSubmit, onCancel, initial }) {
   );
 }
 
+function InvoicePicker({ pesertaList, onPick, onCancel }) {
+  const [id, setId] = useState(pesertaList[0]?.id || "");
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-[#6B6455]">Pilih peserta untuk invoice di luar cicilan reguler, misalnya sewa asrama atau biaya tambahan lain. Peserta yang sudah lunas pun bisa dipilih.</p>
+      <div>
+        <label className="text-xs text-[#6B6455] block mb-1">Peserta</label>
+        <Select value={id} onChange={(e) => setId(e.target.value)}>
+          {pesertaList.map((p) => <option key={p.id} value={p.id}>{p.nama}</option>)}
+        </Select>
+      </div>
+      <div className="flex gap-2 pt-2">
+        <Btn onClick={() => onPick(id)}>Lanjut</Btn>
+        <Btn variant="ghost" onClick={onCancel}>Batal</Btn>
+      </div>
+    </div>
+  );
+}
+
 function InvoiceEditForm({ initial, onSubmit, onCancel }) {
   const [nama, setNama] = useState(initial.nama);
   const [batch, setBatch] = useState(initial.batch || "");
@@ -847,7 +885,7 @@ function InvoiceEditForm({ initial, onSubmit, onCancel }) {
         <div className="space-y-2">
           {items.map((it, i) => (
             <div key={i} className="flex gap-2 items-start">
-              <div className="flex-1"><Input placeholder="Deskripsi (mis. Biaya seragam)" value={it.deskripsi} onChange={(e) => setItem(i, { deskripsi: e.target.value })} /></div>
+              <div className="flex-1"><Input placeholder="Deskripsi (mis. Sewa asrama)" value={it.deskripsi} onChange={(e) => setItem(i, { deskripsi: e.target.value })} /></div>
               <div className="w-36"><Input type="number" placeholder="Nominal" value={it.nominal} onChange={(e) => setItem(i, { nominal: e.target.value })} /></div>
               <button type="button" disabled={items.length === 1} onClick={() => setItems(items.filter((_, idx) => idx !== i))}
                 className="px-2 py-2 text-[#A6402F] disabled:opacity-30" title="Hapus baris">×</button>
